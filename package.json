@@ -1,0 +1,21 @@
+{
+    "name": "kuma-unified",
+    "version": "1.0.0",
+    "description": "Unified Uptime Kuma integration: status viewer dashboard, M365 service health monitor, and Vipre endpoint fleet health monitor",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@azure/msal-node": "^5.3.0",
+        "axios": "^1.18.1",
+        "dotenv": "^17.4.2",
+        "express": "^5.2.1",
+        "node-fetch": "^2.7.0",
+        "socket.io-client": "^4.8.3",
+        "winston": "^3.19.0"
+    }
+}
