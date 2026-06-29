@@ -138,8 +138,10 @@
         (isRegOnly ? '<span class="ml-auto text-[9px] text-gray-600 flex-shrink-0 italic">parked</span>' : '');
       pill.appendChild(topRow);
 
-      // Heartbeat tick bar (history from Kuma)
-      pill.appendChild(buildTickBar(m.recentBeats));
+      // Heartbeat tick bar — only for full domains (parked domains have no ping/online check)
+      if (!isRegOnly) {
+        pill.appendChild(buildTickBar(m.recentBeats));
+      }
 
       // Detail rows beneath a subtle divider
       const details = document.createElement('div');
