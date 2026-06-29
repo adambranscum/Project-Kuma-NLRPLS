@@ -8,6 +8,11 @@ let staleThresholdDays;
 async function runVipreCheck() {
     const pushUrl = process.env.KUMA_PUSH_URL;
 
+    if (!pushUrl) {
+        logger.error('Cannot run Vipre check: KUMA_PUSH_URL not set');
+        return;
+    }
+
     try {
         const devices = await fetchAllDevices();
         const summary = evaluateFleet(devices, staleThresholdDays);

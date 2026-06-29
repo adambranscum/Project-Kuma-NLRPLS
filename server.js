@@ -4,6 +4,7 @@ const fetch = require('node-fetch');
 const { io } = require('socket.io-client');
 const { startM365Monitor } = require('./m365/monitor');
 const { startVipreMonitor } = require('./vipre/monitor');
+const { startDomainMonitor } = require('./domain/monitor');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -193,4 +194,5 @@ app.listen(PORT, () => {
     console.log(`Kuma unified app running at http://localhost:${PORT}`);
     startM365Monitor();
     startVipreMonitor();
+    startDomainMonitor();
 });

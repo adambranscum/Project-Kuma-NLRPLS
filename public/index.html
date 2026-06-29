@@ -126,7 +126,11 @@
 
           if (isUnhealthyFleet) {
             const unhealthy = unhealthyCounts ? (unhealthyCounts.total - unhealthyCounts.healthy) : null;
-            const color = unhealthyCounts ? (unhealthy === 0 ? 'bg-green-500' : 'bg-red-500') : 'bg-gray-600';
+            let color = 'bg-gray-600';
+            if (unhealthyCounts) {
+              const pct = unhealthyCounts.total > 0 ? (unhealthy / unhealthyCounts.total) * 100 : 0;
+              color = pct < 25 ? 'bg-green-500' : pct < 50 ? 'bg-yellow-500' : 'bg-red-500';
+            }
 
             topRow.innerHTML =
               '<span class="w-2 h-2 rounded-full flex-shrink-0 ' + color + '"></span>' +
@@ -136,7 +140,7 @@
             fleetBar.className = 'relative h-4 rounded-sm overflow-hidden ' + color + ' flex items-center justify-center';
             fleetBar.innerHTML =
               '<span class="text-[10px] font-semibold text-black/80 leading-none">' +
-              (unhealthyCounts ? unhealthy + ' unhealthy / ' + unhealthyCounts.total : 'No data') + '</span>';
+              (unhealthyCounts ? unhealthy + '/' + unhealthyCounts.healthy : (m.msg || 'No heartbeat')) + '</span>';
 
             pill.appendChild(topRow);
             pill.appendChild(fleetBar);
@@ -152,7 +156,7 @@
             fleetBar.className = 'relative h-4 rounded-sm overflow-hidden ' + color + ' flex items-center justify-center';
             fleetBar.innerHTML =
               '<span class="text-[10px] font-semibold text-black/80 leading-none">' +
-              (fleetCounts ? fleetCounts.healthy + '/' + fleetCounts.total : 'No data') + '</span>';
+              (fleetCounts ? fleetCounts.healthy + '/' + fleetCounts.total : (m.msg || 'No heartbeat')) + '</span>';
 
             pill.appendChild(topRow);
             pill.appendChild(fleetBar);

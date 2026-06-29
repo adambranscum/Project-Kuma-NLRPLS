@@ -22,9 +22,8 @@ async function fetchAllDevices() {
     const headers = getAuthHeaders();
     const devices = [];
     let offset = 0;
-    let total = null;
 
-    while (total === null || offset < total) {
+    while (true) {
         const response = await axios.get(`${BASE_URL}/ext/devices`, {
             headers,
             params: { limit: PAGE_SIZE, offset },
@@ -38,10 +37,14 @@ async function fetchAllDevices() {
         }
 
         devices.push(...data.devices);
-        total = data.metadata?.total ?? devices.length;
+
+        if (data.devices.length < PAGE_SIZE) {
+            break;
+        }
+
         offset += PAGE_SIZE;
 
-        logger.debug('Fetched device page', { offset, total, pageCount: data.devices.length });
+        logger.debug('Fetched device page', { offset, pageCount: data.devices.length });
     }
 
     return devices;
