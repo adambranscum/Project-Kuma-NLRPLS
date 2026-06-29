@@ -73,6 +73,14 @@
       return 'bg-gray-600';
     }
 
+    // Returns a Tailwind text color based on days remaining vs the warn threshold
+    function expiryColor(days, warnDays) {
+      if (days === null || days === undefined) return 'text-gray-500';
+      if (days <= 0) return 'text-red-400';
+      if (days <= warnDays) return 'text-yellow-400';
+      return 'text-green-400';
+    }
+
     // Parses counts out of messages like "3 of 166 devices unhealthy" or
     // "All 166 devices healthy". Returns { healthy, total } or null if the
     // message doesn't match either pattern.
@@ -102,7 +110,117 @@
       return 'bg-red-500';
     }
 
-    function buildMonitorList(monitors, limit) {
+    function buildTickBar(recentBeats) {
+      const beats = (recentBeats && recentBeats.length > 0) ? recentBeats : [null];
+      const bar = document.createElement('div');
+      bar.className = 'flex gap-px';
+      beats.forEach(s => {
+        const tick = document.createElement('span');
+        tick.className = 'flex-1 h-1 rounded-sm ' + tickColor(s);
+        bar.appendChild(tick);
+      });
+      return bar;
+    }
+
+    // Builds an expanded domain pill with structured Online / SSL / Domain detail rows
+    function buildDomainPill(m, domainInfo, thresholds) {
+      const pill = document.createElement('div');
+      pill.className = 'flex flex-col bg-[#181c23] rounded px-2 py-1.5 gap-1';
+
+      const isRegOnly = domainInfo.type === 'reg-only';
+
+      // Top row: status dot + domain name + optional "parked" badge
+      const topRow = document.createElement('div');
+      topRow.className = 'flex items-center gap-1.5';
+      topRow.innerHTML =
+        '<span class="w-2 h-2 rounded-full flex-shrink-0 ' + statusDot(m.status) + '"></span>' +
+        '<span class="text-[11px] leading-none truncate">' + m.name + '</span>' +
+        (isRegOnly ? '<span class="ml-auto text-[9px] text-gray-600 flex-shrink-0 italic">parked</span>' : '');
+      pill.appendChild(topRow);
+
+      // Heartbeat tick bar (history from Kuma)
+      pill.appendChild(buildTickBar(m.recentBeats));
+
+      // Detail rows beneath a subtle divider
+      const details = document.createElement('div');
+      details.className = 'border-t border-gray-700/50 pt-1 mt-0.5 flex flex-col gap-0.5';
+
+      function detailRow(label, valueHtml) {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-1 text-[10px]';
+        row.innerHTML = '<span class="text-gray-600 w-11 flex-shrink-0">' + label + '</span>' + valueHtml;
+        return row;
+      }
+
+      if (!isRegOnly) {
+        // Online status row
+        const ol = domainInfo.online;
+        if (ol && ol.online) {
+          details.appendChild(detailRow('Online',
+            '<span class="text-green-400">' + ol.protocol.toUpperCase() + ' ' + ol.statusCode + '</span>' +
+            '<span class="text-gray-600 ml-auto">' + ol.responseTimeMs + 'ms</span>'
+          ));
+        } else {
+          details.appendChild(detailRow('Online',
+            '<span class="text-red-400">' + ((ol && ol.error) ? ol.error : 'Unreachable') + '</span>'
+          ));
+        }
+
+        // SSL certificate row
+        const ssl = domainInfo.ssl;
+        if (!ssl || ssl.error) {
+          details.appendChild(detailRow('SSL',
+            '<span class="text-gray-600">N/A</span>'
+          ));
+        } else {
+          const sslColor = expiryColor(ssl.daysUntilExpiry, thresholds.ssl);
+          const sslText = ssl.daysUntilExpiry <= 0
+            ? 'Expired ' + Math.abs(ssl.daysUntilExpiry) + 'd ago'
+            : ssl.daysUntilExpiry + 'd';
+          details.appendChild(detailRow('SSL',
+            '<span class="' + sslColor + '">' + sslText + '</span>' +
+            (ssl.issuer ? '<span class="text-gray-600 ml-auto truncate max-w-[80px]">' + ssl.issuer + '</span>' : '')
+          ));
+        }
+      }
+
+      // Domain registration expiry row
+      const reg = domainInfo.registration;
+      if (!reg || reg.error) {
+        details.appendChild(detailRow('Domain',
+          '<span class="text-gray-600">RDAP ERR</span>'
+        ));
+      } else {
+        const regColor = expiryColor(reg.daysUntilExpiry, thresholds.domain);
+        const regText = reg.daysUntilExpiry === null
+          ? '—'
+          : reg.daysUntilExpiry <= 0
+            ? 'Expired ' + Math.abs(reg.daysUntilExpiry) + 'd ago'
+            : reg.daysUntilExpiry + 'd';
+        details.appendChild(detailRow('Domain',
+          '<span class="' + regColor + '">' + regText + '</span>' +
+          (reg.registrar ? '<span class="text-gray-600 ml-auto truncate max-w-[80px]">' + reg.registrar + '</span>' : '')
+        ));
+      }
+
+      pill.appendChild(details);
+      return pill;
+    }
+
+    // Look up domain data by monitor name.
+    // First tries an exact key match (monitor named exactly "nlrlibrary.org"),
+    // then falls back to checking if any domain key appears inside the monitor name.
+    function findDomainInfo(monitorName, domainData) {
+      if (!domainData || !domainData.domains) return null;
+      if (domainData.domains[monitorName]) return domainData.domains[monitorName];
+      const nameLower = monitorName.toLowerCase();
+      const entry = Object.entries(domainData.domains).find(([domain]) =>
+        nameLower.includes(domain.toLowerCase())
+      );
+      return entry ? entry[1] : null;
+    }
+
+    function buildMonitorList(monitors, limit, domainData) {
       const list = document.createElement('div');
       list.className = 'col-scroll flex-1 overflow-y-auto px-1.5 py-1.5 flex flex-col gap-1';
 
@@ -113,6 +231,13 @@
         list.appendChild(empty);
       } else {
         monitors.slice(0, limit).forEach(m => {
+          // Domain monitors get an expanded pill with structured detail rows
+          const domainInfo = findDomainInfo(m.name, domainData);
+          if (domainInfo) {
+            list.appendChild(buildDomainPill(m, domainInfo, domainData.thresholds));
+            return;
+          }
+
           const pill = document.createElement('div');
           pill.className = 'flex flex-col bg-[#181c23] rounded px-2 py-1.5 gap-1';
 
@@ -194,13 +319,18 @@
 
     async function load() {
       try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
+        const [statusRes, domainRes] = await Promise.all([
+          fetch('/api/status'),
+          fetch('/api/domains').catch(() => null),
+        ]);
+        const data = await statusRes.json();
+        const domainData = domainRes ? await domainRes.json().catch(() => null) : null;
+
         if (!data.socketConnected) {
           document.getElementById('board').innerHTML =
             '<div class="col-span-6 text-center text-yellow-500 text-sm">Waiting on Uptime Kuma login (Socket.IO not connected yet)...</div>';
         } else {
-          render(data.columns);
+          render(data.columns, domainData);
         }
       } catch (e) {
         document.getElementById('board').innerHTML =
@@ -210,7 +340,7 @@
         'Updated ' + new Date().toLocaleTimeString();
     }
 
-    function render(columns) {
+    function render(columns, domainData) {
       const board = document.getElementById('board');
       board.innerHTML = '';
 
@@ -239,7 +369,7 @@
               '<span class="text-gray-500 font-normal">(' + monitors.length + ')</span>';
 
             col.appendChild(header);
-            col.appendChild(buildMonitorList(monitors, SLOTS_PER_COLUMN));
+            col.appendChild(buildMonitorList(monitors, SLOTS_PER_COLUMN, domainData));
             wrapper.appendChild(col);
           });
 
@@ -276,7 +406,7 @@
               '<span class="text-gray-500 font-normal ml-auto">(' + monitors.length + ')</span>';
 
             section.appendChild(header);
-            section.appendChild(buildMonitorList(monitors, SLOTS_PER_SECTION));
+            section.appendChild(buildMonitorList(monitors, SLOTS_PER_SECTION, domainData));
             col.appendChild(section);
             sectionIdx++;
           });
@@ -297,7 +427,7 @@
               '<span class="text-gray-500 font-normal ml-auto">(' + monitors.length + ')</span>';
 
             section.appendChild(header);
-            section.appendChild(buildMonitorList(monitors, SLOTS_PER_SECTION));
+            section.appendChild(buildMonitorList(monitors, SLOTS_PER_SECTION, domainData));
             col.appendChild(section);
           });
         } else {
@@ -311,7 +441,7 @@
             '<span class="text-gray-500 font-normal">(' + monitors.length + ')</span>';
 
           col.appendChild(header);
-          col.appendChild(buildMonitorList(monitors, SLOTS_PER_COLUMN));
+          col.appendChild(buildMonitorList(monitors, SLOTS_PER_COLUMN, domainData));
         }
 
         board.appendChild(col);
