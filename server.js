@@ -54,15 +54,14 @@ function connectSocket() {
         console.log(`Monitor list updated: ${Object.keys(monitorCache).length} monitors`);
     });
 
-    socket.on('heartbeatList', (allBeats) => {
-        if (!allBeats || typeof allBeats !== 'object') {
-            console.error('Unexpected heartbeatList payload shape:', typeof allBeats);
-            return;
+    socket.on('heartbeatList', (monitorID, data, overwrite) => {
+        if (!monitorID) return;
+        const id = String(monitorID);
+        if (overwrite || !heartbeatCache[id]) {
+            heartbeatCache[id] = data || [];
+        } else {
+            heartbeatCache[id].push(...(data || []));
         }
-        for (const [monitorID, beats] of Object.entries(allBeats)) {
-            heartbeatCache[String(monitorID)] = beats || [];
-        }
-        console.log(`Initial heartbeat history loaded for ${Object.keys(allBeats).length} monitors`);
     });
 
     socket.on('heartbeat', (data) => {
