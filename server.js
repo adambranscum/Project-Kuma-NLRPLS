@@ -121,7 +121,10 @@ app.get('/api/status', async (req, res) => {
                     const beats = heartbeatCache[monitorId] || hbData.heartbeatList?.[monitorId] || [];
                     const lastBeat = beats[beats.length - 1];
                     const status = lastBeat ? lastBeat.status : null;
-                    const msg = lastBeat ? lastBeat.msg : null;
+                    const rawMsg = lastBeat ? lastBeat.msg : null;
+                    const msg = Array.isArray(rawMsg)
+                        ? rawMsg.filter(s => s && s !== 'OK').join(' ').trim() || null
+                        : rawMsg;
                     const recentBeats = beats.slice(-20).map(b => b.status);
                     col.extraSections[extraTag.name.trim()].push({ id: monitor.id, name: monitor.name, status, msg, recentBeats });
                     continue;
@@ -145,7 +148,10 @@ app.get('/api/status', async (req, res) => {
             const beats = heartbeatCache[monitorId] || hbData.heartbeatList?.[monitorId] || [];
             const lastBeat = beats[beats.length - 1];
             const status = lastBeat ? lastBeat.status : null;
-            const msg = lastBeat ? lastBeat.msg : null;
+            const rawMsg = lastBeat ? lastBeat.msg : null;
+            const msg = Array.isArray(rawMsg)
+                ? rawMsg.filter(s => s && s !== 'OK').join(' ').trim() || null
+                : rawMsg;
             const recentBeats = beats.slice(-20).map(b => b.status);
             const monitorObj = { id: monitor.id, name: monitor.name, status, msg, recentBeats };
 
